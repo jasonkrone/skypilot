@@ -223,13 +223,28 @@ def _create_instances(ec2_fail_fast, cluster_name: str,
             # Try each subnet for per_subnet_tries times.
             subnet_id = subnet_ids[i // per_subnet_tries]
 
-            network_interfaces = [{
-                'SubnetId': subnet_id,
-                'DeviceIndex': 0,
-                # Whether the VM(s) should have a public IP.
-                'AssociatePublicIpAddress': associate_public_ip_address,
-                'Groups': security_group_ids,
-            }]
+            use_efa = True
+            # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/p5-efa.html
+            if use_efa:
+                network_interfaces = [{
+                    'SubnetId': subnet_id,
+                    "NetworkCardIndex": 0,
+                    "DeviceIndex": 0,
+                    "AssociatePublicIpAddress": False,
+                    "Groups": security_group_ids,
+                    "InterfaceType": "efa",
+                    "DeleteOnTermination": True
+                }]
+                for card_idx in range(1, 32):
+                    network_interfaces.append({
+                        'SubnetId': subnet_id,
+                        "NetworkCardIndex": card_idx,
+                        "DeviceIndex": 1,
+                        "InterfaceType": "efa",
+                        "AssociatePublicIpAddress": False,
+                        "Groups": security_group_ids,
+                        "DeleteOnTermination": True
+                    })
             conf['NetworkInterfaces'] = network_interfaces
 
             instances = _ec2_call_with_retry_on_server_error(
@@ -336,9 +351,11 @@ def run_instances(region: str, cluster_name_on_cloud: str,
                 'Key': 'Name',
                 'Value': f'sky-{cluster_name_on_cloud}-worker'
             }]
+
+        target_instance_tags = [tag for tag in target_instance.tags if tag["Key"][:4] != "aws:"]
         ec2.meta.client.create_tags(
             Resources=[target_instance.id],
-            Tags=target_instance.tags + node_tag,
+            Tags=target_instance_tags + node_tag,
         )
         return target_instance.id
 

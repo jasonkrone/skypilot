@@ -76,13 +76,17 @@ available_node_types:
             Iops: {{disk_iops}}
             Throughput: {{disk_throughput}}
             {% endif %}
-      {% if use_spot %}
+      #{% if use_spot %}
       InstanceMarketOptions:
-          MarketType: spot
-          # Additional options can be found in the boto docs, e.g.
+        MarketType: capacity-block
+        #MarketType: spot
+        # Additional options can be found in the boto docs, e.g.
           #   SpotOptions:
           #       MaxPrice: MAX_HOURLY_PRICE
-      {% endif %}
+      CapacityReservationSpecification:
+        CapacityReservationTarget:
+          CapacityReservationId: cr-0e6f0cb3064c9b378
+      #{% endif %}
       # Use cloud init in UserData to set up the authorized_keys to get
       # around the number of keys limit and permission issues with
       # ec2.describe_key_pairs.
